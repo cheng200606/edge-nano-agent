@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# 日志与运行时产物
+*.log
+*.pid
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# Docker 本地导出镜像
+*.tar
+
+# 实验临时文件（正式 results/ figures/ 需要提交，不忽略）
+*.tmp
+~$*
