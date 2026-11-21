@@ -18,13 +18,26 @@
 
 ## 进度（截止 2026-12-05）
 
-- [x] 11.21 选题论证、SRS v1.1、环境验证、基础镜像 `edgeguard-base` 构建
-- [ ] 11.22–11.24 docker-compose 8 服务、amqtt broker、MQTT 全链路打通
-- [ ] 11.25–11.27 节点完整功能（推理 / 告警抑制 / WAL / 指纹）+ 两级断网补传
-- [ ] 11.28–11.30 网关五步关联、根因 Top1、`tc` 弱网注入
-- [ ] 12.01–12.02 七组实验跑通、数据落盘、图表生成
+- [x] 11.21 选题论证、SRS v1.1、环境验证、基础镜像构建
+- [x] 11.21 **compose 骨架提前完成并端到端验证**（8 服务 + broker + 事件链路：母线故障 3 告警收敛为 1 条结论）
+- [ ] 11.22–11.24 节点完整功能（自编码器 / 告警抑制 / WAL / 指纹）
+- [ ] 11.25–11.27 两级断网补传 + 网关五步关联、根因 Top1
+- [ ] 11.28–11.30 `tc` 弱网注入、七组实验跑通、数据落盘
+- [ ] 12.01–12.02 图表生成 + 补充实验
 - [ ] 12.03–12.05 报告、答辩 PPT、现场演示脚本
+
+详细任务分解见 [03-开发迭代方案.md](03-开发迭代方案.md)。
+
+## 快速开始
+
+```bash
+docker compose up -d                    # 拉起 8 容器（broker/edge-01~05/gateway/cloud）
+docker compose logs -f gateway cloud    # 观察：t=15s Bus-A 三设备故障 → 1 条 bus_fault 结论
+docker compose down -v                  # 干净回收
+```
+
+演示剧本（内置）：Bus-A 三台设备 t=15s 同时电流冲击（母线故障）；dev-04 t=40s 单独故障；dev-05 正常。预期产出：`rc-000001 bus_fault (Bus-A, conf≈0.90)` 与 `rc-000002 single_device (dev-04)`。
 
 ## 环境要求
 
-Windows + Docker Desktop（WSL2 后端）。Docker Hub 与 PyPI 官网不可达：基础镜像基于本机 `miniob-course:latest` 自建（`docker/Dockerfile.base`），pip 走阿里云镜像，弱网由容器内 `tc netem` 真实注入（需 `NET_ADMIN`）。
+Windows + Docker Desktop（WSL2 后端）。基础镜像 `edgeguard-base` 基于 `python:3.12-slim` 自建（`docker/Dockerfile.base`，pip 走阿里云镜像）。broker 使用本机缓存的 `emqx/emqx:5.10`，宿主机调试端口 **18830**（1883 被本机其他 EMQX 容器占用）。弱网由容器内 `tc netem` 注入（需 `NET_ADMIN`）。

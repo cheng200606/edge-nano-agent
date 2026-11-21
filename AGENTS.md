@@ -1,39 +1,47 @@
 # AGENTS.md
 
 EdgeGuard —— 多边缘节点协同的工业设备故障关联 Agent（边缘计算课程大作业，选题 A+）。
-仓库当前处于需求基线阶段（SRS v1.1），代码尚未创建；动手前先读文档。
+当前阶段：**compose 骨架已完成并端到端验证（2026-11-21）**，节点/网关完整功能按迭代方案推进中；动手前先读文档。
 
 ## 必读文档（改动前必看）
-- `01-大作业需求文档.md`：SRS v1.1 基线。需求、量化指标（G-1~G-8）、MQTT 协议、实验设计、2 周里程碑均以它为准。
-- `多边缘节点协同的工业设备故障关联 Agent 全解析.md`：SRS v1.1 的对齐参考文档（网关协同架构、拓扑加权根因的原始出处）。
-- `02-大作业类型推荐.md`：选题论证与环境可行性实测记录。
+- `03-开发迭代方案.md`：迭代计划（I0~I10）、当前状态、风险登记册、SRS v1.2 修订清单——**施工顺序以此为准**
+- `01-大作业需求文档.md`：SRS v1.1 基线。需求、量化指标（G-1~G-8）、MQTT 协议、实验设计均以它为准
+- `多边缘节点协同的工业设备故障关联 Agent 全解析.md`：SRS v1.1 的对齐参考文档
 
 ## 关键决策（已确认，不要推翻）
-- 消息总线：amqtt 0.12.2（MQTT 3.1.1），不用 mosquitto / Redis
-- 模型：纯 numpy 手写自编码器（< 10k 参数，模型文件 ≤ 200 KB），禁用 torch / scikit-learn
-- 网关关联：可解释规则（拓扑树加权 + 根因 Top1 排序），保留 `CorrelationStrategy` 接口
+- 消息总线：**emqx 5.10**（本机缓存镜像，2026-11-21 由 amqtt 变更而来，回退只需改 compose broker 段；理由见迭代方案 §7 D-1）
+- 模型：纯 numpy 手写自编码器（< 10k 参数，模型文件 ≤ 200 KB），禁用 torch / scikit-learn **进容器镜像**（宿主机实验脚本允许 sklearn 做 E4 对比）
+- 网关关联：可解释规则（拓扑树加权 + 根因 Top1），保留 `CorrelationStrategy` 接口
 - 架构：8 容器 = 5 边缘节点 + 网关 + 云 + broker，`docker compose up -d` 一键拉起
 
-## 规划目录（SRS 附录 A，创建代码时遵循）
-- `docker/`：基础镜像构建（`Dockerfile.base` FROM 本机 `miniob-course:latest`）
-- `services/common|node|gateway|cloud/`：协议、MQTT 封装、指标、四个服务模块
-- `scenarios/`：故障注入、断网、弱网场景定义；`experiments/`：实验编排与结果落盘
-- `scripts/`：一键启动 / 断网 / 演示；`results/` `figures/` `report/`：产物目录
+## 运行命令
+```bash
+docker compose up -d                    # 拉起 8 容器
+docker compose logs -f gateway cloud    # 观察事件链路
+docker compose down -v                  # 干净回收
+```
+演示剧本内置：Bus-A 三设备 t=15s 母线故障 → 1 条 bus_fault 结论；dev-04 t=40s 单设备结论。宿主机调试端口 18830（1883 被本机另一个 EMQX 容器占用）。
 
-## 环境硬约束（2026-11-21 实测，违反必失败）
-- Docker Hub 不可达：禁止 `FROM` 官方镜像，全部基于本机 `miniob-course:latest`（Ubuntu 24.04 + Python 3.12.3 + tc）自建
-- PyPI 官网 / 清华源不可达：pip 必须走 `https://mirrors.aliyun.com/pypi/simple/`
-- 底座装包必须加 `--break-system-packages`（PEP 668）和 `--ignore-installed`（Debian 装的 psutil 无 RECORD，否则 amqtt 依赖解析报错）
-- 弱网用容器内 `tc netem` 真实注入，compose 中需 `cap_add: [NET_ADMIN]`
+## 目录现状（骨架已存在）
+- `docker/Dockerfile.base`：基础镜像（FROM python:3.12-slim + iproute2 + numpy/paho）
+- `services/common|node|gateway|cloud/`：公共层与三个服务模块（已可运行）
+- 规划中：`scenarios/`（场景）、`experiments/`（实验+训练脚本）、`scripts/`（冒烟/断网/演示）、`results/`、`figures/`、`report/`
+
+## 环境事实（2026-11-21 实测，替代 SRS 旧记录）
+- Docker Hub 已恢复可达（python:3.12-slim 拉取成功）；SRS C-3/R-04 待 v1.2 修订
+- 原记录的 miniob-course / edgeguard-base 镜像已被清理，现基础镜像由 `docker/Dockerfile.base` 重建（~160 MB）
+- pip 走 `https://mirrors.aliyun.com/pypi/simple/`（保持确定性）
+- 弱网用容器内 `tc netem`，compose 中已预留 `cap_add: [NET_ADMIN]`
 - 平台为 Windows + Docker Desktop（WSL2 后端）
 
 ## 协议与代码约定
-- MQTT 主题前缀 `edgeguard/`，主题表见 SRS §6.1；事件通道 QoS1 + 应用层去重，摘要/心跳 QoS0
-- 事件载荷 ≤ 400 B，只含 8 维特征指纹，禁止携带原始时序样本（可审计要求，FR-04）
-- 聚类窗 1 s（v1.1 由 15 s 收紧）；首个异常 → 根因结论 ≤ 500 ms；告警收敛 85%~95%
-- 断网补传保留原始检测时间戳（误差 = 0）；WAL 超限按「保新弃旧」淘汰
-- 固定随机种子，同配置两次实验指标差 < 1%（NFR-05）
-- 配置外置、类型标注、结构化日志（NFR-07/08）；文档为中文
+- MQTT 主题（SRS §6.1）：事件主题为 **6 层** `edgeguard/bus/{bus}/dev/{dev}/event`——`dev` 是字面量！订阅过滤器必须写 `edgeguard/bus/+/dev/+/event`（少一层会导致"SUBACK 正常但永不投递"的静默故障，2026-11-21 踩坑已验证）
+- paho-mqtt 2.x：回调统一走 `common/mqtt.py` 封装（CallbackAPIVersion.VERSION2）；**必须显式注册 on_message**，否则消息被静默丢弃
+- 事件通道 QoS1 + 应用层去重（event_id 幂等），摘要/心跳 QoS0
+- 事件载荷 ≤ 400 B，只含 8 维特征指纹，禁止携带原始时序样本（FR-04 可审计）
+- 聚类窗 1 s；根因结论时延 ≤ 500 ms；告警收敛 85%~95%
+- 断网补传保留原始检测时间戳（误差=0）；WAL 超限「保新弃旧」
+- 固定随机种子（NFR-05）；配置外置（`EG_*` 环境变量）、类型标注、logging 禁 print
 
 ## Git
 - 远程 `origin` = github.com/cheng200606/edge-nano-agent，主分支 `main`，单人课程仓库直接提交 main

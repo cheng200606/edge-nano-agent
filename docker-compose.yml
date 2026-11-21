@@ -1,0 +1,112 @@
+# EdgeGuard 骨架编排（8 容器，SRS §3.5 资源配额）
+# 用法：docker compose up -d        一键拉起
+#       docker compose logs -f gateway cloud   观察事件链路
+#       docker compose down -v     干净回收（FR-14）
+# 演示剧本：Bus-A 三台设备 t=15s 同时电流冲击 → 网关 1s 窗聚类出 1 条 bus_fault；
+#           dev-04 t=40s 单独故障 → 单设备结论；dev-05 正常。
+name: edgeguard
+
+x-node: &node
+  image: edgeguard-base:latest
+  command: ["python", "-m", "node.main"]
+  working_dir: /app
+  volumes:
+    - ./services:/app:ro
+  cap_add:
+    - NET_ADMIN          # 供 I5 迭代容器内 tc netem 弱网注入（SRS §2.5）
+  depends_on:
+    - broker
+  restart: unless-stopped
+  environment: &node-env
+    EG_MQTT_HOST: broker
+    EG_MQTT_PORT: "1883"
+
+services:
+  # ---------- 消息总线 ----------
+  # 2026-11-21 决策变更：amqtt 0.12.2 → emqx 5.10（对应 SRS 决策②，待 v1.2 复核）
+  # 背景：调试期间的"amqtt 匹配缺陷"系误诊——真实根因是网关订阅过滤器少算了
+  #       'dev' 字面量层级（5 层 vs 主题实际 6 层）。amqtt 已被探针实验排除嫌疑。
+  # 保留 EMQX 的理由：生产级稳定性、自带 Dashboard 可观测性、本机已缓存镜像
+  # （无 Docker Hub 依赖）；paho 客户端与协议层零改动，如需回退 amqtt 仅改本文件。
+  broker:
+    image: emqx/emqx:5.10
+    ports:
+      - "18830:1883"     # 调试用：宿主机直连 broker（18830 避开本机已占用的 1883/用户 EMQX）
+    cpus: 0.5
+    mem_limit: 256m      # emqx 对内存要求高于 amqtt，128m 有 OOM 风险
+    restart: unless-stopped
+
+  # ---------- 边缘节点 ×5（Bus-A: dev-01~03，Bus-B: dev-04~05）----------
+  edge-01:
+    <<: *node
+    environment:
+      <<: *node-env
+      EG_DEVICE_ID: dev-01
+      EG_BUS_ID: Bus-A
+      EG_FAULT_AT_S: "15"
+      EG_FAULT_DUR_S: "6"
+    cpus: 1
+    mem_limit: 512m
+
+  edge-02:
+    <<: *node
+    environment:
+      <<: *node-env
+      EG_DEVICE_ID: dev-02
+      EG_BUS_ID: Bus-A
+      EG_FAULT_AT_S: "15"
+      EG_FAULT_DUR_S: "6"
+    cpus: 1
+    mem_limit: 512m
+
+  edge-03:
+    <<: *node
+    environment:
+      <<: *node-env
+      EG_DEVICE_ID: dev-03
+      EG_BUS_ID: Bus-A
+      EG_FAULT_AT_S: "15"
+      EG_FAULT_DUR_S: "6"
+    cpus: 1
+    mem_limit: 512m
+
+  edge-04:
+    <<: *node
+    environment:
+      <<: *node-env
+      EG_DEVICE_ID: dev-04
+      EG_BUS_ID: Bus-B
+      EG_FAULT_AT_S: "40"
+      EG_FAULT_DUR_S: "6"
+    cpus: 1
+    mem_limit: 512m
+
+  edge-05:
+    <<: *node
+    environment:
+      <<: *node-env
+      EG_DEVICE_ID: dev-05
+      EG_BUS_ID: Bus-B
+      EG_FAULT_AT_S: "0"   # 0 = 不注入，全程正常
+    cpus: 1
+    mem_limit: 512m
+
+  # ---------- 边缘网关 ----------
+  gateway:
+    <<: *node
+    command: ["python", "-m", "gateway.main"]
+    cpus: 2
+    mem_limit: 1g
+
+  # ---------- 云端 ----------
+  cloud:
+    <<: *node
+    command: ["python", "-m", "cloud.main"]
+    volumes:
+      - ./services:/app:ro
+      - cloud-data:/data
+    cpus: 1
+    mem_limit: 512m
+
+volumes:
+  cloud-data:
