@@ -85,6 +85,11 @@ export interface CreateCommandInput {
   /** 回执截止时刻（毫秒时间戳）；台账轮询据此判 timeout */
   deadlineAt: number;
   sentAt?: number;
+  /**
+   * 调用方幂等键。相同 (productId, deviceId, idempotencyKey) 只建一条台账，
+   * 重复调用返回已有那条。不传则不做幂等约束。
+   */
+  idempotencyKey?: string;
 }
 
 const nowMs = () => Date.now();
@@ -390,25 +395,67 @@ export class DeviceService {
   // ---------------------------------------------------------------- 命令台账
 
   createCommand(input: CreateCommandInput): DeviceCommandRow {
+    // 幂等：同一条幂等键直接返回已有台账，不重复下发
+    if (input.idempotencyKey) {
+      const existing = this.findCommandByIdempotencyKey(
+        input.productId,
+        input.deviceId,
+        input.idempotencyKey,
+      );
+      if (existing) return existing;
+    }
+
     const id = `cmd-${nowMs().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const sentAt = input.sentAt ?? nowMs();
-    this.db
-      .insert(deviceCommands)
-      .values({
-        id,
-        productId: input.productId,
-        deviceId: input.deviceId,
-        command: input.command,
-        input: (input.input ?? {}) as never,
-        status: "pending",
-        requestedBy: input.requestedBy ?? "",
-        sentAt,
-        deadlineAt: input.deadlineAt,
-        createdAt: nowMs(),
-      })
-      .onConflictDoNothing()
-      .run();
+    const result = outcome(
+      this.db
+        .insert(deviceCommands)
+        .values({
+          id,
+          productId: input.productId,
+          deviceId: input.deviceId,
+          command: input.command,
+          input: (input.input ?? {}) as never,
+          idempotencyKey: input.idempotencyKey ?? null,
+          status: "pending",
+          requestedBy: input.requestedBy ?? "",
+          sentAt,
+          deadlineAt: input.deadlineAt,
+          createdAt: nowMs(),
+        })
+        .onConflictDoNothing()
+        .run(),
+    );
+
+    // 并发下同键竞争：插入被忽略时回读已有那条
+    if (Number(result.changes ?? 0) === 0 && input.idempotencyKey) {
+      const existing = this.findCommandByIdempotencyKey(
+        input.productId,
+        input.deviceId,
+        input.idempotencyKey,
+      );
+      if (existing) return existing;
+    }
+
     return this.getCommand(id) as DeviceCommandRow;
+  }
+
+  findCommandByIdempotencyKey(
+    productId: string,
+    deviceId: string,
+    idempotencyKey: string,
+  ): DeviceCommandRow | undefined {
+    return this.db
+      .select()
+      .from(deviceCommands)
+      .where(
+        and(
+          eq(deviceCommands.productId, productId),
+          eq(deviceCommands.deviceId, deviceId),
+          eq(deviceCommands.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .get();
   }
 
   getCommand(id: string): DeviceCommandRow | undefined {

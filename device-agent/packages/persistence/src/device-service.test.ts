@@ -255,3 +255,58 @@ describe("删除产品事务级联", () => {
     expect(svc.deleteProduct("nope").deleted).toBe(false);
   });
 });
+
+describe("命令幂等键（回归：曾被 sentAt 毫秒唯一键静默吞掉）", () => {
+  test("同一毫秒内两次同名命令都会建台账", () => {
+    const a = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "turn_on",
+      deadlineAt: Date.now() + 60_000,
+    });
+    const b = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "turn_on",
+      deadlineAt: Date.now() + 60_000,
+    });
+    expect(a.id).not.toBe(b.id);
+    expect(svc.getCommand(a.id)?.status).toBe("pending");
+    expect(svc.getCommand(b.id)?.status).toBe("pending");
+  });
+
+  test("相同幂等键返回同一条台账，不重复下发", () => {
+    const key = `idem-${Date.now()}`;
+    const a = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "set_mode",
+      idempotencyKey: key,
+      deadlineAt: Date.now() + 60_000,
+    });
+    const b = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "set_mode",
+      idempotencyKey: key,
+      deadlineAt: Date.now() + 60_000,
+    });
+    expect(b.id).toBe(a.id);
+  });
+
+  test("不传幂等键时互不影响（NULL 不参与唯一性）", () => {
+    const a = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "no_key",
+      deadlineAt: Date.now() + 60_000,
+    });
+    const b = svc.createCommand({
+      productId: "p1",
+      deviceId: "dev-1",
+      command: "no_key",
+      deadlineAt: Date.now() + 60_000,
+    });
+    expect(a.id).not.toBe(b.id);
+  });
+});

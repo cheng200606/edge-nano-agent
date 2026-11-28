@@ -26,6 +26,12 @@ export const deviceCommands = sqliteTable(
     command: text("command").notNull(),
     /** 下发时的入参快照 */
     input: text("input", { mode: "json" }).notNull().default(sql`'{}'`),
+    /**
+     * 调用方提供的幂等键（HTTP 的 Idempotency-Key、工具调用的 dedupe 键）。
+     * 允许为 NULL —— SQLite 的唯一索引把 NULL 视为互不相同，
+     * 因此"没有幂等键"的命令不会被误判为重复。
+     */
+    idempotencyKey: text("idempotency_key"),
     status: text("status").notNull().default("pending"),
     /** 设备回执原文 */
     response: text("response", { mode: "json" }),
@@ -43,8 +49,8 @@ export const deviceCommands = sqliteTable(
       "device_commands_status_check",
       sql`${t.status} IN ('pending','completed','failed','timeout')`,
     ),
-    // 幂等：同一设备同一时刻只能有一条相同命令（唯一键 + INSERT OR IGNORE）
-    uniqueIndex("uq_device_commands_dedupe").on(t.productId, t.deviceId, t.command, t.sentAt),
+    // 幂等：同一设备同一条幂等键只允许一条（NULL 不参与唯一性判断）
+    uniqueIndex("uq_device_commands_idempotency").on(t.productId, t.deviceId, t.idempotencyKey),
     index("idx_device_commands_status").on(t.status),
     index("idx_device_commands_device").on(t.productId, t.deviceId),
     index("idx_device_commands_deadline").on(t.deadlineAt),
