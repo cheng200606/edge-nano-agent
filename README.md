@@ -1,43 +1,112 @@
-# edge-nano-agent · EdgeGuard
+# edge-nano-agent
 
-**EdgeGuard —— 多边缘节点协同的工业设备故障关联 Agent**（边缘计算课程大作业，选题 A+）
+> 边缘计算课程大作业 · **按老师下发的《Device-Agent 开发指南》用 TypeScript / Bun 还原 `device-agent 0.5.1`** · 截止 2026-12-05
+>
+> 验收口径：M0–M8 按 **L2 行为一致**（同样的输入产生同样的可观察行为），L3 逐字一致只对
+> `use_command` / `workflow-runner` / `timer-runner` 三个文件做走查。
 
-端 → 边缘节点 → 网关 → 云 四层架构：
+---
 
-- **节点 ×5**：三通道信号模拟 + 纯 numpy 自编码器本地推理，仅上报 8 维事件指纹（上行数据量降低 ≥ 100×）
-- **网关 ×1**：1 s 滑窗聚类 + 拓扑树加权，输出根因 Top1（单设备 / 母线 / 区域扰动），告警收敛 85%~95%
-- **云 ×1**：全局看板、模型 / 阈值 / 规则下发
-- **韧性**：两段式断网自治（节点↔网关、网关↔云），WAL 补传零丢失；`tc netem` 容器内真实弱网注入
-
-## 文档
-
-| 文档 | 内容 |
-| --- | --- |
-| [01-大作业需求文档.md](01-大作业需求文档.md) | SRS v1.1：需求、量化指标 G-1~G-8、MQTT 协议、七组实验、2 周里程碑 |
-| [02-大作业类型推荐.md](02-大作业类型推荐.md) | 选题论证（A~H 八方案打分）与环境可行性实测 |
-
-## 进度（截止 2026-12-05）
-
-- [x] 11.21 选题论证、SRS v1.1、环境验证、基础镜像构建
-- [x] 11.21 **compose 骨架提前完成并端到端验证**（8 服务 + broker + 事件链路：母线故障 3 告警收敛为 1 条结论）
-- [ ] 11.22–11.24 节点完整功能（自编码器 / 告警抑制 / WAL / 指纹）
-- [ ] 11.25–11.27 两级断网补传 + 网关五步关联、根因 Top1
-- [ ] 11.28–11.30 `tc` 弱网注入、七组实验跑通、数据落盘
-- [ ] 12.01–12.02 图表生成 + 补充实验
-- [ ] 12.03–12.05 报告、答辩 PPT、现场演示脚本
-
-详细任务分解见 [03-开发迭代方案.md](03-开发迭代方案.md)。
-
-## 快速开始
+## 现在能跑什么
 
 ```bash
-docker compose up -d                    # 拉起 8 容器（broker/edge-01~05/gateway/cloud）
-docker compose logs -f gateway cloud    # 观察：t=15s Bus-A 三设备故障 → 1 条 bus_fault 结论
-docker compose down -v                  # 干净回收
+cd device-agent
+bun install
+
+bun run demo     # 一条命令：自启真实 mosquitto + 网关 + 本地设备模拟器
 ```
 
-演示剧本（内置）：Bus-A 三台设备 t=15s 同时电流冲击（母线故障）；dev-04 t=40s 单独故障；dev-05 正常。预期产出：`rc-000001 bus_fault (Bus-A, conf≈0.90)` 与 `rc-000002 single_device (dev-04)`。
+`demo` 会打印可直接复制的 curl 命令（健康检查 / 版本 / Agent SSE 对话 / 设备事件），
+按 `Ctrl+C` 按序关闭（模拟器 → MQTT → HTTP → DB → broker）。
+
+不想起 MQTT 也能验 Agent 链路：
+
+```bash
+bun run verify:m4     # 15 项断言，不依赖 broker
+```
+
+---
+
+## 进度
+
+| 里程碑 | 对应单元 | 状态 | 关键产出 |
+| --- | --- | --- | --- |
+| M0 工程骨架 | LU-00 / LU-01 | ✅ | 10 域配置（`.strict()` 拒未知域）、JSONL 日志 ≤8 KB、`/livez`+`/readyz` 语义分离 |
+| M1 契约层 | LU-02 | ✅ | DeviceSpec（7 类型/3 事件类型）、spec→TypeBox、10 个 MQTT 主题模板、工具描述符、会话 ID 校验 |
+| M2 持久化 | LU-03 | ✅ | **24 张表** Drizzle schema + drizzle-kit 迁移 + `DeviceService` 门面 |
+| M3 设备闭环 | LU-04 | ✅ | 真实 mosquitto + MQTT 入口 + 命令台账四态 + 本地模拟器 |
+| M4 Agent 单轮 | LU-05 | ✅ | `POST /api/chat` SSE、pi-agent-core 的 `Agent` 类、mock↔真模型一行配置切换 |
+| M5 工具系统 | LU-06 | ⏳ | 下一步 |
+| M6 通道与 API | LU-07 | ⏳ | |
+| M7 工作流 | LU-09 | ⏳ | 降级为设计文档 |
+| M8 定时 + 技能 | LU-10 | ⏳ | 降级为设计文档 |
+| M9 控制台 + 发布 | LU-12 / LU-13 | ⏳ | 仅 `bun build` |
+
+排期与验收口径以 [`AGENTS.md`](AGENTS.md) 为准，答辩一律用 **LU 编号**。
+
+---
+
+## 验收命令
+
+| 命令 | 验证什么 | 当前结果 |
+| --- | --- | --- |
+| `bun run typecheck` | tsc 类型检查 | 0 error |
+| `bun run lint` | Biome（格式化 + lint + import 排序） | 0 error |
+| `bun test` | 单元测试 + 集成测试 | **123 pass / 0 fail** |
+| `bun run db:check` | 起临时库跑完迁移，核对表数与 PRAGMA | 24 表 / WAL / FK on |
+| `bun run e2e:m3` | 真实 broker 上的设备闭环（10 项断言） | 全 PASS |
+| `bun run verify:m4` | SSE 端到端（15 项断言，不依赖 broker） | 全 PASS |
+| `bun run demo` | 答辩现场演示 | 可用 |
+
+---
+
+## 仓库结构
+
+```
+edge-nano-agent/
+├─ AGENTS.md                    项目规约、进度、环境事实、踩过的坑（改代码前先读）
+├─ device-agent/                ★ 本次实现（独立 Bun workspace）
+│  ├─ apps/agent-gateway/       唯一可执行应用
+│  ├─ packages/                 shared / persistence / iot-platform / prompts / skitter
+│  ├─ config/                   mosquitto.conf
+│  ├─ drizzle/                  drizzle-kit 生成的迁移
+│  ├─ scripts/                  demo / e2e / verify / broker / db 自检
+│  └─ README.md                 实现细节与已知偏差
+└─ （归档）EdgeGuard 旧方案      01-*.md / 02-*.md / 03-*.md / services/ / docker/ 等
+```
+
+`device-agent/` 是**唯一在写的目录**，其余为历史材料。
+
+---
 
 ## 环境要求
 
-Windows + Docker Desktop（WSL2 后端）。基础镜像 `edgeguard-base` 基于 `python:3.12-slim` 自建（`docker/Dockerfile.base`，pip 走阿里云镜像）。broker 使用本机缓存的 `emqx/emqx:5.10`，宿主机调试端口 **18830**（1883 被本机其他 EMQX 容器占用）。弱网由容器内 `tc netem` 注入（需 `NET_ADMIN`）。
+| 项 | 要求 | 本机实测 |
+| --- | --- | --- |
+| Bun | ≥ 1.3.0 | 1.4.5 |
+| Node | ≥ 22（仅 tsc / 工具链用） | v24.20.0 |
+| MQTT broker | mosquitto 2.x（真实 broker） | 2.1.4，项目托管在 **1884** |
+| 操作系统 | Windows / macOS / Linux | Windows |
+
+- **1884 而非 1883**：mosquitto 安装器会注册一个 SYSTEM 身份的 Windows 服务占着 `127.0.0.1:1883`，
+  停止它需要 UAC 管理员权限。项目不依赖该服务，用独立端口 + 自带配置，换机器可复现。
+- npm 官方源在本机不可达，`device-agent/.npmrc` 已固定 `registry=https://registry.npmmirror.com`。
+
+---
+
+## 归档：EdgeGuard（勿继续施工）
+
+仓库里 `01-大作业需求文档.md`、`02-大作业类型推荐.md`、`03-开发迭代方案.md`、
+`多边缘节点协同的工业设备故障关联 Agent 全解析.md`、`services/`、`docker/`、`docker-compose.yml`
+属于 **2026-11-23 之前的方向**（Python 边缘故障关联 Agent），已降级为历史参考。
+
+方向已于 2026-11-23 转为老师下发的《Device-Agent 开发指南》（TypeScript / Bun），
+不要再往 EdgeGuard 里加功能。其中可借鉴的经验（MQTT 通配符层级匹配、QoS1 幂等去重、
+状态落库思想）已吸收进 `device-agent/` 的 LU-03 / LU-04。
+
+---
+
+## 注意
+
+- 仓库是 **PUBLIC** 的。老师下发的课件、《需求说明书》禁止入库。
+- `device-agent/.device_agent/`（config.json 含密钥、sqlite、日志）与 `node_modules/` 已 gitignore。
