@@ -97,12 +97,19 @@ function Stop-Broker {
 
 function Show-Status {
   $proc = Get-BrokerProcess
-  if ($null -eq $proc) {
-    Write-Output 'project broker: stopped'
-  } else {
-    Write-Output "project broker: running pid=$($proc.Id)"
-  }
   $listen = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+
+  if ($null -ne $proc) {
+    Write-Output "project broker: running pid=$($proc.Id)"
+  } elseif ($listen) {
+    # pid file missing but the port is bound: someone else (or a previous run
+    # whose pid file was deleted) owns it. Saying "stopped" here would be a lie.
+    $owner = ($listen | Select-Object -First 1).OwningProcess
+    Write-Output "project broker: port $Port held by pid=$owner (not managed by this script)"
+  } else {
+    Write-Output 'project broker: stopped'
+  }
+
   if ($listen) {
     $listen | ForEach-Object { Write-Output ("  listening " + $_.LocalAddress + ":" + $_.LocalPort) }
   } else {
