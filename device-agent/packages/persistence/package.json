@@ -1,6 +1,11 @@
-﻿{
+{
   "name": "@device-agent/persistence",
   "version": "0.5.1",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./db/*": "./src/db/*.ts"
+  }
 }
