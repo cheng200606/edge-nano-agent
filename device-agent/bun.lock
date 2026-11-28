@@ -6,6 +6,7 @@
       "name": "device-agent",
       "dependencies": {
         "@earendil-works/pi-agent-core": "1.1.0",
+        "@earendil-works/pi-ai": "1.7.0",
         "@sinclair/typebox": "^0.34.52",
         "commander": "^15.1.0",
         "drizzle-orm": "^0.45.4",
@@ -27,6 +28,9 @@
         "@device-agent/iot-platform": "workspace:*",
         "@device-agent/persistence": "workspace:*",
         "@device-agent/shared": "workspace:*",
+        "@earendil-works/pi-agent-core": "1.1.0",
+        "@earendil-works/pi-ai": "1.7.0",
+        "@sinclair/typebox": "^0.34.52",
       },
     },
     "packages/iot-platform": {

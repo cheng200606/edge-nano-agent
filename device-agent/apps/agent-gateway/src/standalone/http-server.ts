@@ -1,7 +1,8 @@
 /**
- * 最小 HTTP 服务：/livez、/readyz、/health、/api/version。
+ * 最小 HTTP 服务：/livez、/readyz、/health、/api/version、/api/chat。
  *
- * 对应真实源码：apps/agent-gateway/src/channels/http/channel.ts（M0 只取健康检查骨架）
+ * 对应真实源码：apps/agent-gateway/src/channels/http/channel.ts（M0 只取健康检查骨架，
+ * M4 挂上 POST /api/chat 的 SSE 处理器）
  *
  * ⚠️ 评分红线（AGENTS.md）：
  *   1. 端口 3000 默认只监听 127.0.0.1。写死 0.0.0.0 会被判安全事故。
@@ -18,6 +19,9 @@ export interface HttpServerHandle {
   close(): Promise<void>;
 }
 
+/** `/api/chat` 的处理器（M4 由 http-api/chat.ts 提供；不传则该路由 404）。 */
+export type ChatRouteHandler = (req: Request) => Promise<Response>;
+
 export interface HttpServerOptions {
   port: number;
   health: HealthRegistry;
@@ -26,6 +30,8 @@ export interface HttpServerOptions {
   version?: string;
   /** 默认 127.0.0.1；只有显式传 0.0.0.0 才会对外监听 */
   hostname?: string;
+  /** POST /api/chat：SSE 流式对话 */
+  chat?: ChatRouteHandler;
 }
 
 const DEFAULT_HOSTNAME = "127.0.0.1";
@@ -86,6 +92,11 @@ export function createHttpServer(opts: HttpServerOptions): HttpServerHandle {
           cloud: opts.config.cloud.worker,
           iotPlatform: opts.config.iotPlatform.providerId,
         });
+      }
+
+      // Agent 单轮：SSE。路由存在性判断放这里，方法/入参校验由 handler 自己给 code
+      if (url.pathname === "/api/chat" && opts.chat) {
+        return opts.chat(req);
       }
 
       return errorBody("NOT_FOUND", `no route for ${req.method} ${url.pathname}`);

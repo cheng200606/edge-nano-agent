@@ -24,7 +24,9 @@
     "mqtt:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 start",
     "mqtt:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 stop",
     "mqtt:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 status",
-    "e2e:m3": "bun scripts/m3-e2e.ts"
+    "e2e:m3": "bun scripts/m3-e2e.ts",
+    "verify:m4": "bun scripts/m4-verify.ts",
+    "demo": "bun scripts/demo.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
@@ -35,6 +37,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.7.0",
     "@sinclair/typebox": "^0.34.52",
     "commander": "^15.1.0",
     "drizzle-orm": "^0.45.4",

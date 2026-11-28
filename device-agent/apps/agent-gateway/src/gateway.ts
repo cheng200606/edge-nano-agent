@@ -5,8 +5,10 @@
  *
  * M0：配置 → 日志 → HTTP
  * M3：+ SQLite（迁移就绪）+ MQTT 链路 + 设备入口 + 命令台账 + 可选模拟器
+ * M4：+ Agent 单轮（pi-agent-core 循环 + mock 模型 + 会话 jsonl）与 POST /api/chat（SSE）
  *
  * 降级原则：MQTT 连不上**不阻塞启动**，只是 /readyz 报 mqtt.ready=false。
+ * 关闭顺序：定时器 → 模拟器 → Agent 回合（中止在飞请求）→ MQTT → HTTP → DB。
  */
 import { join } from "node:path";
 import { type DatabaseHandle, openDatabase } from "@device-agent/persistence/db/client";
@@ -21,12 +23,14 @@ import {
   summarizeConfig,
 } from "@device-agent/shared/device-agent-config";
 import { resolveRuntimeBaseDir } from "@device-agent/shared/runtime-paths";
-import { loadWorkspaceEnv, resolveDeviceAgentHome } from "@device-agent/shared/workspace-env";
+import { resolveDeviceAgentHome } from "@device-agent/shared/workspace-env";
 
+import { TurnService } from "./agent/turn";
 import { CommandDispatcher } from "./devices/command-dispatcher";
 import { attachIngress } from "./devices/mqtt-ingress";
 import { MqttLink } from "./devices/mqtt-link";
 import { DeviceSimulator } from "./devices/simulator";
+import { createChatHandler } from "./http-api/chat";
 import { createHealthRegistry, type HealthRegistry } from "./standalone/health";
 import { createHttpServer, type HttpServerHandle } from "./standalone/http-server";
 import { configureLogging, createLogger } from "./utils/logger";
@@ -41,6 +45,8 @@ export interface GatewayHandle {
   service: DeviceService;
   mqtt: MqttLink;
   dispatcher: CommandDispatcher;
+  /** Agent 单轮服务（M4） */
+  turn: TurnService;
   simulator?: DeviceSimulator;
   stop(): Promise<void>;
 }
@@ -145,13 +151,28 @@ export async function startGateway(opts: GatewayOptions = {}): Promise<GatewayHa
     simulator.start();
   }
 
+  // ---------------- Agent 单轮 ----------------
+  const turn = new TurnService({
+    config: loaded.config,
+    home,
+    service,
+    logger: createLogger("Agent"),
+  });
+
   // ---------------- HTTP ----------------
   const port = opts.port ?? Number(process.env.PORT ?? 3000);
-  const server = createHttpServer({ port, health, home, config: loaded.config });
+  const server = createHttpServer({
+    port,
+    health,
+    home,
+    config: loaded.config,
+    chat: createChatHandler({ turn, logger: createLogger("Chat") }),
+  });
   log.info("Gateway ready", {
     url: server.url,
     mqtt: mqtt.isReady() ? "connected" : "connecting",
     simulator: simulator ? "on" : "off",
+    agent: `${turn.model.provider}/${turn.model.id}`,
   });
 
   return {
@@ -162,10 +183,13 @@ export async function startGateway(opts: GatewayOptions = {}): Promise<GatewayHa
     service,
     mqtt,
     dispatcher,
+    turn,
     simulator,
     async stop() {
       clearInterval(sweep);
       if (simulator) await simulator.stop();
+      // 先中止在飞的 Agent 回合，否则 server.close() 会一直等 SSE 连接
+      turn.dispose();
       await mqtt.close();
       await server.close();
       service.dispose();

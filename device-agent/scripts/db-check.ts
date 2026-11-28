@@ -9,11 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDatabase } from "../packages/persistence/src/db/client";
-import {
-  countUserTables,
-  currentVersion,
-  ensureSchema,
-} from "../packages/persistence/src/db/schema-lifecycle";
+import { countUserTables, ensureSchema } from "../packages/persistence/src/db/schema-lifecycle";
 
 const migrationsFolder = join(import.meta.dir, "..", "drizzle");
 const dir = mkdtempSync(join(tmpdir(), "da-dbcheck-"));

@@ -22,8 +22,11 @@
 - **M1 / LU-02 契约层** ✅ DeviceSpec（7 类型/3 事件类型/telemetry 兼容）、spec→TypeBox、10 个 MQTT 主题模板、工具描述符、会话 ID 校验
 - **M2 / LU-03 持久化** ✅ 24 张表 Drizzle schema + drizzle-kit 迁移 + `DeviceService` 门面（幂等注册、游标分页、命令台账四态、事务级联删除）
 - **M3 / LU-04 设备闭环** ✅ 真实 mosquitto(1884) + MQTT 入口 + 命令台账回填 + 本地模拟器；`bun run e2e:m3` 十项断言全 PASS
-- 质量门：`bun test` 91 pass / 0 fail；`tsc --noEmit` 0 error；`biome check` 0 error
-- 下一步：**M4 / LU-05 Agent 单轮**（接 pi-agent-core 的 agent-loop + mock 模型 + SSE `/api/chat`，保证之后能换真模型）
+- **M4 / LU-05 Agent 单轮** ✅ `POST /api/chat` SSE 流式；用 pi-agent-core 的 `Agent` 类（**无手写循环**）；mock StreamFn 可一行配置换真模型；会话落 `pi-sessions/<id>.jsonl` 可续聊
+- 质量门：`bun test` 123 pass / 0 fail；`tsc --noEmit` 0 error；`biome check` 0 error
+- 一键演示：`bun run demo`（自启 broker + 网关 + 模拟器，打印 curl 命令，Ctrl+C 按序关闭）
+- 验收脚本：`bun run e2e:m3`（设备闭环）、`bun run verify:m4`（SSE 15 项断言，不依赖 broker）
+- 下一步：**M5 / LU-06 工具系统**（use_command 全链路 + capability-policy 越权 403）
 
 ## 硬性规则（评分红线，违反即扣分）
 - **L1 契约一致**（占 20%）：接口路径、工具名、配置项必须与原系统相同；端口 3000 默认只监听 127.0.0.1（写死 0.0.0.0 是安全事故）；`/livez` 不查库、`/readyz` 语义分离
