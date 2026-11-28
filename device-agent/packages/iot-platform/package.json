@@ -1,6 +1,14 @@
-﻿{
+{
   "name": "@device-agent/iot-platform",
   "version": "0.5.1",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts",
+    "./providers/*": "./src/providers/*.ts"
+  },
+  "dependencies": {
+    "@device-agent/shared": "workspace:*"
+  }
 }

@@ -1,6 +1,11 @@
-﻿{
+{
   "name": "@device-agent/agent-gateway",
   "version": "0.5.1",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@device-agent/iot-platform": "workspace:*",
+    "@device-agent/persistence": "workspace:*",
+    "@device-agent/shared": "workspace:*"
+  }
 }

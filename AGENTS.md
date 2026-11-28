@@ -21,8 +21,9 @@
 - **M0 / LU-01 骨架** ✅ 10 域配置（`.strict()` 拒未知域）、JSONL 日志 ≤8KB、`/livez` + `/readyz` 语义分离、默认只监听 127.0.0.1、CLI 分派
 - **M1 / LU-02 契约层** ✅ DeviceSpec（7 类型/3 事件类型/telemetry 兼容）、spec→TypeBox、10 个 MQTT 主题模板、工具描述符、会话 ID 校验
 - **M2 / LU-03 持久化** ✅ 24 张表 Drizzle schema + drizzle-kit 迁移 + `DeviceService` 门面（幂等注册、游标分页、命令台账四态、事务级联删除）
-- 质量门：`bun test` 74 pass / 0 fail；`tsc --noEmit` 0 error；`biome check` 0 error
-- 下一步：**M3 / LU-04 设备闭环**（真接 mosquitto 1884 → 遥测入库 → 命令下发 → 响应回填）
+- **M3 / LU-04 设备闭环** ✅ 真实 mosquitto(1884) + MQTT 入口 + 命令台账回填 + 本地模拟器；`bun run e2e:m3` 十项断言全 PASS
+- 质量门：`bun test` 91 pass / 0 fail；`tsc --noEmit` 0 error；`biome check` 0 error
+- 下一步：**M4 / LU-05 Agent 单轮**（接 pi-agent-core 的 agent-loop + mock 模型 + SSE `/api/chat`，保证之后能换真模型）
 
 ## 硬性规则（评分红线，违反即扣分）
 - **L1 契约一致**（占 20%）：接口路径、工具名、配置项必须与原系统相同；端口 3000 默认只监听 127.0.0.1（写死 0.0.0.0 是安全事故）；`/livez` 不查库、`/readyz` 语义分离
@@ -65,6 +66,10 @@
 - **drizzle-kit 需要 spawn esbuild**：沙箱默认禁止管道型子进程，报 `spawn EPERM`，需完整权限运行
 - **drizzle-kit 用 tsx 在系统临时目录建 `tsx-<user>`**，本机报 `EPERM: mkdir`；把 `TEMP`/`TMP` 指到工作区即可
 - 因此提供 `bun run db:check` 作为**不依赖 spawn 的数据库验收入口**
+- **workspace 包必须在 package.json 里声明 `"workspace:*"` 依赖**：Bun 不会为未声明的 workspace 包建链接，
+  表现为 `Cannot find module '@device-agent/shared/xxx'`（tsconfig paths 只在部分场景兜住）
+- **`strict:false` 下布尔字面量判别式不窄化**：`ok: true | false` 的联合用 `if (!r.ok)` 收不窄，
+  解析结果一律用「带可选字段的单一结构」而非 discriminated union
 
 ## Git
 - 远程 `origin` = github.com/cheng200606/edge-nano-agent，主分支 `main`，conventional commits 直接提交 main

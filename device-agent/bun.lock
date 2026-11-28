@@ -23,14 +23,25 @@
     "apps/agent-gateway": {
       "name": "@device-agent/agent-gateway",
       "version": "0.5.1",
+      "dependencies": {
+        "@device-agent/iot-platform": "workspace:*",
+        "@device-agent/persistence": "workspace:*",
+        "@device-agent/shared": "workspace:*",
+      },
     },
     "packages/iot-platform": {
       "name": "@device-agent/iot-platform",
       "version": "0.5.1",
+      "dependencies": {
+        "@device-agent/shared": "workspace:*",
+      },
     },
     "packages/persistence": {
       "name": "@device-agent/persistence",
       "version": "0.5.1",
+      "dependencies": {
+        "@device-agent/shared": "workspace:*",
+      },
     },
     "packages/prompts": {
       "name": "@device-agent/prompts",

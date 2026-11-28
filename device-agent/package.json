@@ -20,7 +20,11 @@
     "build": "bun scripts/build-agent-gateway.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/db-migrate.ts",
-    "db:check": "bun scripts/db-check.ts"
+    "db:check": "bun scripts/db-check.ts",
+    "mqtt:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 start",
+    "mqtt:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 stop",
+    "mqtt:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/mqtt-broker.ps1 status",
+    "e2e:m3": "bun scripts/m3-e2e.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
