@@ -11,6 +11,7 @@
  *   4. 全过程不依赖 REST，直接驱动 dispatcher
  */
 import { mkdtempSync, rmSync } from "node:fs";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,7 +20,28 @@ import { startGateway } from "../apps/agent-gateway/src/gateway";
 const PRODUCT = "demo-plug";
 const DEVICE = "demo-dev-1";
 
+const BROKER_PORT = 1884;
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** 端口是否已有人在监听。 */
+function portOpen(port: number, host = "127.0.0.1"): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = connect({ port, host, timeout: 500 });
+    sock.once("connect", () => {
+      sock.destroy();
+      resolve(true);
+    });
+    sock.once("error", () => {
+      sock.destroy();
+      resolve(false);
+    });
+    sock.once("timeout", () => {
+      sock.destroy();
+      resolve(false);
+    });
+  });
+}
 
 async function waitFor<T>(
   fn: () => T | undefined,
@@ -35,9 +57,38 @@ async function waitFor<T>(
   return undefined;
 }
 
+/**
+ * 若 1884 没有 broker，就用项目脚本拉起一个，结束时再停掉。
+ *
+ * 为什么不直接 Bun.spawn(mosquitto)：
+ *   - mosquitto 是长驻进程，Bun.spawn 的 stderr/stdout 管道在本进程存活期间
+ *     不可关闭，任何"等它输出"的写法都会阻塞；
+ *   - 项目脚本已经用 WMI 把 broker 脱离进程树，行为更可控。
+ */
+async function ensureBroker(): Promise<{ owned: boolean }> {
+  if (await portOpen(BROKER_PORT)) {
+    process.stdout.write(`broker: reuse existing on ${BROKER_PORT}\n`);
+    return { owned: false };
+  }
+  const script = join(import.meta.dir, "mqtt-broker.ps1");
+  process.stdout.write(`broker: starting via ${script}\n`);
+  const proc = Bun.spawn(
+    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "start"],
+    { stdout: "pipe", stderr: "pipe" },
+  );
+  await proc.exited;
+  const up = await waitFor(async () => ((await portOpen(BROKER_PORT)) ? true : undefined), 10_000);
+  if (!up) {
+    throw new Error(`broker failed to start on ${BROKER_PORT} via ${script}`);
+  }
+  process.stdout.write(`broker: ready on ${BROKER_PORT}\n`);
+  return { owned: true };
+}
+
 const dir = mkdtempSync(join(tmpdir(), "da-m3-"));
 const dbPath = join(dir, "e2e.sqlite");
 let gw: Awaited<ReturnType<typeof startGateway>> | null = null;
+let broker: Awaited<ReturnType<typeof ensureBroker>> | null = null;
 let failures = 0;
 
 function check(label: string, ok: boolean, detail = ""): void {
@@ -47,6 +98,7 @@ function check(label: string, ok: boolean, detail = ""): void {
 
 try {
   process.stdout.write(`db: ${dbPath}\n`);
+  broker = await ensureBroker();
   gw = await startGateway({ port: 3101, databasePath: dbPath, enableSimulator: true });
 
   // 1. MQTT 连上
@@ -104,6 +156,18 @@ try {
   failures += 1;
 } finally {
   if (gw) await gw.stop();
+  if (broker?.owned) {
+    const script = join(import.meta.dir, "mqtt-broker.ps1");
+    try {
+      const stop = Bun.spawn(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "stop"],
+        { stdout: "ignore", stderr: "ignore" },
+      );
+      await stop.exited;
+    } catch {
+      // ignore
+    }
+  }
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
