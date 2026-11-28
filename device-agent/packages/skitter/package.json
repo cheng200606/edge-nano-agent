@@ -1,0 +1,6 @@
+﻿{
+  "name": "@device-agent/skitter",
+  "version": "0.5.1",
+  "private": true,
+  "type": "module"
+}

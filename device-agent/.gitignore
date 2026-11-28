@@ -1,0 +1,17 @@
+# Node / Bun
+node_modules/
+bun.lockb
+dist/
+*.tsbuildinfo
+
+# 运行态（含 config.json 密钥、sqlite、日志）
+.device_agent/
+workspace/
+
+# 测试与覆盖率产物
+coverage/
+*.lcov
+
+# 本地 broker 日志
+*.log
+*.pid

@@ -1,0 +1,6 @@
+﻿{
+  "name": "@device-agent/persistence",
+  "version": "0.5.1",
+  "private": true,
+  "type": "module"
+}

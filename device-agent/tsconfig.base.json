@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "types": ["node", "bun"],
+    "lib": ["ESNext", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@device-agent/shared": ["packages/shared/src/index.ts"],
+      "@device-agent/shared/*": ["packages/shared/src/*"],
+      "@device-agent/persistence": ["packages/persistence/src/index.ts"],
+      "@device-agent/persistence/*": ["packages/persistence/src/*"],
+      "@device-agent/iot-platform/*": ["packages/iot-platform/src/*"],
+      "@device-agent/prompts/*": ["packages/prompts/src/*"],
+      "@device-agent/skitter/*": ["packages/skitter/src/*"]
+    }
+  }
+}
