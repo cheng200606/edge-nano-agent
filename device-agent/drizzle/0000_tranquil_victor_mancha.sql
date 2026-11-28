@@ -1,3 +1,81 @@
+CREATE TABLE `workflow_dedupe_keys` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`workflow_id` text NOT NULL,
+	`dedupe_key` text NOT NULL,
+	`expires_at` integer DEFAULT 0 NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_workflow_dedupe_keys` ON `workflow_dedupe_keys` (`workflow_id`,`dedupe_key`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_dedupe_expires` ON `workflow_dedupe_keys` (`expires_at`);--> statement-breakpoint
+CREATE TABLE `workflow_rules` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`description` text DEFAULT '' NOT NULL,
+	`enabled` integer DEFAULT true NOT NULL,
+	`trigger` text DEFAULT '{}' NOT NULL,
+	`graph` text DEFAULT '{}' NOT NULL,
+	`scope` text DEFAULT '{}' NOT NULL,
+	`created_by` text DEFAULT '' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_workflow_rules_enabled` ON `workflow_rules` (`enabled`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_rules_name` ON `workflow_rules` (`name`);--> statement-breakpoint
+CREATE TABLE `workflow_run_steps` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`run_id` text NOT NULL,
+	`node_id` text DEFAULT '' NOT NULL,
+	`type` text NOT NULL,
+	`action_type` text DEFAULT '' NOT NULL,
+	`ok` integer DEFAULT true NOT NULL,
+	`duration_ms` integer DEFAULT 0 NOT NULL,
+	`details` text DEFAULT '{}' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	FOREIGN KEY (`run_id`) REFERENCES `workflow_runs`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "workflow_run_steps_type_check" CHECK("workflow_run_steps"."type" IN ('action','switch','join','agent','decision'))
+);
+--> statement-breakpoint
+CREATE INDEX `idx_workflow_run_steps_run` ON `workflow_run_steps` (`run_id`);--> statement-breakpoint
+CREATE TABLE `workflow_runs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`workflow_id` text NOT NULL,
+	`trigger` text DEFAULT '{}' NOT NULL,
+	`status` text DEFAULT 'running' NOT NULL,
+	`started_at` integer DEFAULT 0 NOT NULL,
+	`finished_at` integer,
+	`summary` text DEFAULT '' NOT NULL,
+	`error` text,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	FOREIGN KEY (`workflow_id`) REFERENCES `workflow_rules`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "workflow_runs_status_check" CHECK("workflow_runs"."status" IN ('running','completed','partial_failed','failed'))
+);
+--> statement-breakpoint
+CREATE INDEX `idx_workflow_runs_workflow` ON `workflow_runs` (`workflow_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `idx_workflow_runs_status` ON `workflow_runs` (`status`);--> statement-breakpoint
+CREATE TABLE `device_commands` (
+	`id` text PRIMARY KEY NOT NULL,
+	`product_id` text NOT NULL,
+	`device_id` text NOT NULL,
+	`command` text NOT NULL,
+	`input` text DEFAULT '{}' NOT NULL,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`response` text,
+	`error_code` text,
+	`error_message` text,
+	`requested_by` text DEFAULT '' NOT NULL,
+	`sent_at` integer DEFAULT 0 NOT NULL,
+	`deadline_at` integer DEFAULT 0 NOT NULL,
+	`completed_at` integer,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "device_commands_status_check" CHECK("device_commands"."status" IN ('pending','completed','failed','timeout'))
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_device_commands_dedupe` ON `device_commands` (`product_id`,`device_id`,`command`,`sent_at`);--> statement-breakpoint
+CREATE INDEX `idx_device_commands_status` ON `device_commands` (`status`);--> statement-breakpoint
+CREATE INDEX `idx_device_commands_device` ON `device_commands` (`product_id`,`device_id`);--> statement-breakpoint
+CREATE INDEX `idx_device_commands_deadline` ON `device_commands` (`deadline_at`);--> statement-breakpoint
 CREATE TABLE `device_events` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`product_id` text DEFAULT '' NOT NULL,
@@ -65,7 +143,7 @@ CREATE TABLE `products` (
 	`version` integer DEFAULT 1 NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "products_id_check" CHECK("products"."id" GLOB '[A-Za-z0-9_-]*'),
+	CONSTRAINT "products_id_check" CHECK("products"."id" NOT GLOB '*[^A-Za-z0-9_-]*'),
 	CONSTRAINT "products_lifecycle_status_check" CHECK("products"."lifecycle_status" IN ('developing','published','archived'))
 );
 --> statement-breakpoint
@@ -78,158 +156,6 @@ CREATE TABLE `tags` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_tags_name` ON `tags` (`name`);--> statement-breakpoint
-CREATE TABLE `device_commands` (
-	`id` text PRIMARY KEY NOT NULL,
-	`product_id` text NOT NULL,
-	`device_id` text NOT NULL,
-	`command` text NOT NULL,
-	`input` text DEFAULT '{}' NOT NULL,
-	`status` text DEFAULT 'pending' NOT NULL,
-	`response` text,
-	`error_code` text,
-	`error_message` text,
-	`requested_by` text DEFAULT '' NOT NULL,
-	`sent_at` integer DEFAULT 0 NOT NULL,
-	`deadline_at` integer DEFAULT 0 NOT NULL,
-	`completed_at` integer,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "device_commands_status_check" CHECK("device_commands"."status" IN ('pending','completed','failed','timeout'))
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_device_commands_dedupe` ON `device_commands` (`product_id`,`device_id`,`command`,`sent_at`);--> statement-breakpoint
-CREATE INDEX `idx_device_commands_status` ON `device_commands` (`status`);--> statement-breakpoint
-CREATE INDEX `idx_device_commands_device` ON `device_commands` (`product_id`,`device_id`);--> statement-breakpoint
-CREATE INDEX `idx_device_commands_deadline` ON `device_commands` (`deadline_at`);--> statement-breakpoint
-CREATE TABLE `workflow_dedupe_keys` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`workflow_id` text NOT NULL,
-	`dedupe_key` text NOT NULL,
-	`expires_at` integer DEFAULT 0 NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_workflow_dedupe_keys` ON `workflow_dedupe_keys` (`workflow_id`,`dedupe_key`);--> statement-breakpoint
-CREATE INDEX `idx_workflow_dedupe_expires` ON `workflow_dedupe_keys` (`expires_at`);--> statement-breakpoint
-CREATE TABLE `workflow_rules` (
-	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`description` text DEFAULT '' NOT NULL,
-	`enabled` integer DEFAULT true NOT NULL,
-	`trigger` text DEFAULT '{}' NOT NULL,
-	`graph` text DEFAULT '{}' NOT NULL,
-	`scope` text DEFAULT '{}' NOT NULL,
-	`created_by` text DEFAULT '' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_workflow_rules_enabled` ON `workflow_rules` (`enabled`);--> statement-breakpoint
-CREATE INDEX `idx_workflow_rules_name` ON `workflow_rules` (`name`);--> statement-breakpoint
-CREATE TABLE `workflow_run_steps` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`run_id` text NOT NULL,
-	`node_id` text DEFAULT '' NOT NULL,
-	`type` text NOT NULL,
-	`action_type` text DEFAULT '' NOT NULL,
-	`ok` integer DEFAULT true NOT NULL,
-	`duration_ms` integer DEFAULT 0 NOT NULL,
-	`details` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`run_id`) REFERENCES `workflow_runs`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "workflow_run_steps_type_check" CHECK("workflow_run_steps"."type" IN ('action','switch','join','agent','decision'))
-);
---> statement-breakpoint
-CREATE INDEX `idx_workflow_run_steps_run` ON `workflow_run_steps` (`run_id`);--> statement-breakpoint
-CREATE TABLE `workflow_runs` (
-	`id` text PRIMARY KEY NOT NULL,
-	`workflow_id` text NOT NULL,
-	`trigger` text DEFAULT '{}' NOT NULL,
-	`status` text DEFAULT 'running' NOT NULL,
-	`started_at` integer DEFAULT 0 NOT NULL,
-	`finished_at` integer,
-	`summary` text DEFAULT '' NOT NULL,
-	`error` text,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`workflow_id`) REFERENCES `workflow_rules`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "workflow_runs_status_check" CHECK("workflow_runs"."status" IN ('running','completed','partial_failed','failed'))
-);
---> statement-breakpoint
-CREATE INDEX `idx_workflow_runs_workflow` ON `workflow_runs` (`workflow_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `idx_workflow_runs_status` ON `workflow_runs` (`status`);--> statement-breakpoint
-CREATE TABLE `agent_timer_runs` (
-	`id` text PRIMARY KEY NOT NULL,
-	`timer_id` text NOT NULL,
-	`status` text DEFAULT 'running' NOT NULL,
-	`started_at` integer DEFAULT 0 NOT NULL,
-	`finished_at` integer,
-	`session_id` text DEFAULT '' NOT NULL,
-	`result_text` text DEFAULT '' NOT NULL,
-	`error` text,
-	FOREIGN KEY (`timer_id`) REFERENCES `agent_timers`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "agent_timer_runs_status_check" CHECK("agent_timer_runs"."status" IN ('running','completed','failed'))
-);
---> statement-breakpoint
-CREATE INDEX `idx_agent_timer_runs_timer` ON `agent_timer_runs` (`timer_id`,`started_at`);--> statement-breakpoint
-CREATE TABLE `agent_timers` (
-	`id` text PRIMARY KEY NOT NULL,
-	`origin_session_id` text DEFAULT '' NOT NULL,
-	`scope` text DEFAULT '{}' NOT NULL,
-	`status` text DEFAULT 'active' NOT NULL,
-	`instruction` text NOT NULL,
-	`schedule_kind` text NOT NULL,
-	`schedule_expr` text NOT NULL,
-	`timezone` text DEFAULT 'Asia/Shanghai' NOT NULL,
-	`next_run_at` integer DEFAULT 0 NOT NULL,
-	`last_run_at` integer,
-	`last_error` text,
-	`execution_policy` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "agent_timers_status_check" CHECK("agent_timers"."status" IN ('active','paused','running','completed','deleted')),
-	CONSTRAINT "agent_timers_schedule_kind_check" CHECK("agent_timers"."schedule_kind" IN ('cron','interval','once'))
-);
---> statement-breakpoint
-CREATE INDEX `idx_agent_timers_next_run` ON `agent_timers` (`status`,`next_run_at`);--> statement-breakpoint
-CREATE INDEX `idx_agent_timers_session` ON `agent_timers` (`origin_session_id`);--> statement-breakpoint
-CREATE TABLE `memory_events` (
-	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
-	`memory_id` text DEFAULT '' NOT NULL,
-	`action` text NOT NULL,
-	`scope_key` text DEFAULT '' NOT NULL,
-	`detail` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "memory_events_action_check" CHECK("memory_events"."action" IN ('created','updated','deleted','read'))
-);
---> statement-breakpoint
-CREATE INDEX `idx_memory_events_memory` ON `memory_events` (`memory_id`,`created_at`);--> statement-breakpoint
-CREATE TABLE `memory_items` (
-	`id` text PRIMARY KEY NOT NULL,
-	`scope_key` text DEFAULT '' NOT NULL,
-	`kind` text DEFAULT 'fact' NOT NULL,
-	`key` text NOT NULL,
-	`value` text DEFAULT '' NOT NULL,
-	`importance` integer DEFAULT 50 NOT NULL,
-	`expires_at` integer DEFAULT 0 NOT NULL,
-	`source` text DEFAULT '' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "memory_items_kind_check" CHECK("memory_items"."kind" IN ('fact','preference','procedure','note')),
-	CONSTRAINT "memory_items_importance_check" CHECK("memory_items"."importance" BETWEEN 0 AND 100)
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_memory_items_scope_key` ON `memory_items` (`scope_key`,`key`);--> statement-breakpoint
-CREATE INDEX `idx_memory_items_scope` ON `memory_items` (`scope_key`);--> statement-breakpoint
-CREATE TABLE `principals` (
-	`id` text PRIMARY KEY NOT NULL,
-	`kind` text NOT NULL,
-	`display_name` text DEFAULT '' NOT NULL,
-	`external_id` text DEFAULT '' NOT NULL,
-	`metadata` text DEFAULT '{}' NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "principals_kind_check" CHECK("principals"."kind" IN ('user','agent','service','device'))
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `uq_principals_external` ON `principals` (`kind`,`external_id`);--> statement-breakpoint
 CREATE TABLE `app_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`app_id` text DEFAULT '' NOT NULL,
@@ -302,6 +228,80 @@ CREATE TABLE `webhook_endpoints` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_webhook_endpoints_enabled` ON `webhook_endpoints` (`enabled`);--> statement-breakpoint
+CREATE TABLE `memory_events` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`memory_id` text DEFAULT '' NOT NULL,
+	`action` text NOT NULL,
+	`scope_key` text DEFAULT '' NOT NULL,
+	`detail` text DEFAULT '{}' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "memory_events_action_check" CHECK("memory_events"."action" IN ('created','updated','deleted','read'))
+);
+--> statement-breakpoint
+CREATE INDEX `idx_memory_events_memory` ON `memory_events` (`memory_id`,`created_at`);--> statement-breakpoint
+CREATE TABLE `memory_items` (
+	`id` text PRIMARY KEY NOT NULL,
+	`scope_key` text DEFAULT '' NOT NULL,
+	`kind` text DEFAULT 'fact' NOT NULL,
+	`key` text NOT NULL,
+	`value` text DEFAULT '' NOT NULL,
+	`importance` integer DEFAULT 50 NOT NULL,
+	`expires_at` integer DEFAULT 0 NOT NULL,
+	`source` text DEFAULT '' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "memory_items_kind_check" CHECK("memory_items"."kind" IN ('fact','preference','procedure','note')),
+	CONSTRAINT "memory_items_importance_check" CHECK("memory_items"."importance" BETWEEN 0 AND 100)
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_memory_items_scope_key` ON `memory_items` (`scope_key`,`key`);--> statement-breakpoint
+CREATE INDEX `idx_memory_items_scope` ON `memory_items` (`scope_key`);--> statement-breakpoint
+CREATE TABLE `principals` (
+	`id` text PRIMARY KEY NOT NULL,
+	`kind` text NOT NULL,
+	`display_name` text DEFAULT '' NOT NULL,
+	`external_id` text DEFAULT '' NOT NULL,
+	`metadata` text DEFAULT '{}' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "principals_kind_check" CHECK("principals"."kind" IN ('user','agent','service','device'))
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_principals_external` ON `principals` (`kind`,`external_id`);--> statement-breakpoint
+CREATE TABLE `agent_timer_runs` (
+	`id` text PRIMARY KEY NOT NULL,
+	`timer_id` text NOT NULL,
+	`status` text DEFAULT 'running' NOT NULL,
+	`started_at` integer DEFAULT 0 NOT NULL,
+	`finished_at` integer,
+	`session_id` text DEFAULT '' NOT NULL,
+	`result_text` text DEFAULT '' NOT NULL,
+	`error` text,
+	FOREIGN KEY (`timer_id`) REFERENCES `agent_timers`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "agent_timer_runs_status_check" CHECK("agent_timer_runs"."status" IN ('running','completed','failed'))
+);
+--> statement-breakpoint
+CREATE INDEX `idx_agent_timer_runs_timer` ON `agent_timer_runs` (`timer_id`,`started_at`);--> statement-breakpoint
+CREATE TABLE `agent_timers` (
+	`id` text PRIMARY KEY NOT NULL,
+	`origin_session_id` text DEFAULT '' NOT NULL,
+	`scope` text DEFAULT '{}' NOT NULL,
+	`status` text DEFAULT 'active' NOT NULL,
+	`instruction` text NOT NULL,
+	`schedule_kind` text NOT NULL,
+	`schedule_expr` text NOT NULL,
+	`timezone` text DEFAULT 'Asia/Shanghai' NOT NULL,
+	`next_run_at` integer DEFAULT 0 NOT NULL,
+	`last_run_at` integer,
+	`last_error` text,
+	`execution_policy` text DEFAULT '{}' NOT NULL,
+	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "agent_timers_status_check" CHECK("agent_timers"."status" IN ('active','paused','running','completed','deleted')),
+	CONSTRAINT "agent_timers_schedule_kind_check" CHECK("agent_timers"."schedule_kind" IN ('cron','interval','once'))
+);
+--> statement-breakpoint
+CREATE INDEX `idx_agent_timers_next_run` ON `agent_timers` (`status`,`next_run_at`);--> statement-breakpoint
+CREATE INDEX `idx_agent_timers_session` ON `agent_timers` (`origin_session_id`);--> statement-breakpoint
 CREATE TABLE `voice_keyword_terms` (
 	`id` text PRIMARY KEY NOT NULL,
 	`term` text NOT NULL,

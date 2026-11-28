@@ -11,10 +11,18 @@
 - ⚠️ 指南上游《需求说明书》1.3 版（35 组/259 条 FR + 37 条 NFR = 296 条）不在本机，需向老师索取；需求条目细节暂以指南引用为准
 
 ## 技术栈与命令（老师规定）
-- Bun ≥ 1.3.0（**本机未装，LU-00 首项**）、Node ≥ 22（本机 v24.18.0 ✓）、TypeScript 5.6、Biome 2.4.5（格式化+lint+import 排序唯一真源）、zod 契约校验、Drizzle + `bun:sqlite`（22 张表）、agent 循环用 `@earendil-works/pi-agent-core@1.1.0`（**禁止手写 while 循环**）
+- Bun ≥ 1.3.0（**本机已装 1.4.5**）、Node ≥ 22（本机 v24.20.0 ✓）、TypeScript 5.6、Biome 2.4.5（格式化+lint+import 排序唯一真源）、zod 契约校验、Drizzle + `bun:sqlite`（**实际 24 张表**）、agent 循环用 `@earendil-works/pi-agent-core@1.1.0`（**禁止手写 while 循环**）
 - 命令：`bun run start` / `bun run typecheck` / `bun run lint` / `bun test` / `bun build apps/agent-gateway/src/main.ts --compile --outfile dist/device-agent.exe`
 - 目录约定（指南 README §6）：`apps/agent-gateway/`（唯一可执行应用）+ `packages/{shared,persistence,iot-platform,prompts,skitter}` + `web/`；运行态 `.device_agent/`（config.json / device_agent.sqlite / logs）不提交
-- MQTT broker：EMQX 5.x 或 Mosquitto（M3/LU-04 起需要）；本机 1883 被已有 EMQX 容器占用，需复用或避开
+- MQTT broker：EMQX 5.x 或 Mosquitto（M3/LU-04 起需要）；**本机用真实 mosquitto 2.1.4，项目托管在 1884**（1883 被安装器服务占用，停止需管理员，故避开）
+
+## 进度（截至 2026-11-28）
+代码位于 `device-agent/`，已按里程碑推进：
+- **M0 / LU-01 骨架** ✅ 10 域配置（`.strict()` 拒未知域）、JSONL 日志 ≤8KB、`/livez` + `/readyz` 语义分离、默认只监听 127.0.0.1、CLI 分派
+- **M1 / LU-02 契约层** ✅ DeviceSpec（7 类型/3 事件类型/telemetry 兼容）、spec→TypeBox、10 个 MQTT 主题模板、工具描述符、会话 ID 校验
+- **M2 / LU-03 持久化** ✅ 24 张表 Drizzle schema + drizzle-kit 迁移 + `DeviceService` 门面（幂等注册、游标分页、命令台账四态、事务级联删除）
+- 质量门：`bun test` 74 pass / 0 fail；`tsc --noEmit` 0 error；`biome check` 0 error
+- 下一步：**M3 / LU-04 设备闭环**（真接 mosquitto 1884 → 遥测入库 → 命令下发 → 响应回填）
 
 ## 硬性规则（评分红线，违反即扣分）
 - **L1 契约一致**（占 20%）：接口路径、工具名、配置项必须与原系统相同；端口 3000 默认只监听 127.0.0.1（写死 0.0.0.0 是安全事故）；`/livez` 不查库、`/readyz` 语义分离
@@ -43,9 +51,20 @@
 - 代码：`services/`（Python 骨架，11.21 曾端到端验证）、`docker-compose.yml`、`docker/`——保留作参考，新方案不用
 - 可借鉴经验：MQTT 通配符层级匹配踩坑、QoS1 幂等去重、状态落库思想（与指南 LU-03/04 呼应）
 
-## 环境事实（2026-11-23 实测）
-- Windows + Git Bash；Bun 未装；Node v24.18.0；原版 device-agent.exe 未在本机找到（LU-00 需要原版发行包，待用户提供）
+## 环境事实（2026-11-28 实测）
+- Windows + Git Bash；**Bun 1.4.5 已装**（`C:\Users\berdy\AppData\Roaming\npm\node_modules\bun\bin\bun.exe`）；Node v24.20.0
+- **npm 官方源不可达，必须走 npmmirror**（仓库已带 `.npmrc` 固定）；Docker Hub 亦不可达
+- **MQTT：真实 mosquitto 2.1.4**，装在 `D:\dsh\bianyuan\mosquitto`，项目托管启动在 **1884**
+  - 1883 被安装器注册的 Windows 服务占用（SYSTEM 身份），停止需 UAC 管理员权限，故避开而不是复用
+  - 启动/停止：`powershell -ExecutionPolicy Bypass -File device-agent/scripts/mqtt-broker.ps1 start|stop|status`
+- pip / PyPI 与 Docker Hub 均不可达；Python 依赖只能在已有镜像里用
 - 仓库 PUBLIC，老师课件/需求说明书不得入库
+
+## 工程环境坑（已踩，务必沿用）
+- **git push 必须 HTTP/1.1**：默认 HTTP/2 传大包会被重置（实测卡 91s 失败）。已在本仓库设 `http.version=HTTP/1.1`；换机器要重设
+- **drizzle-kit 需要 spawn esbuild**：沙箱默认禁止管道型子进程，报 `spawn EPERM`，需完整权限运行
+- **drizzle-kit 用 tsx 在系统临时目录建 `tsx-<user>`**，本机报 `EPERM: mkdir`；把 `TEMP`/`TMP` 指到工作区即可
+- 因此提供 `bun run db:check` 作为**不依赖 spawn 的数据库验收入口**
 
 ## Git
 - 远程 `origin` = github.com/cheng200606/edge-nano-agent，主分支 `main`，conventional commits 直接提交 main

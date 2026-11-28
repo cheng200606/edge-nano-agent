@@ -52,8 +52,10 @@ export const products = sqliteTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    // 产品 ID 同时是 MQTT 主题段，必须是安全字符
-    check("products_id_check", sql`${t.id} GLOB '[A-Za-z0-9_-]*'`),
+    // 产品 ID 同时是 MQTT 主题段，必须是安全字符。
+    // 注意：不能写 `GLOB '[A-Za-z0-9_-]*'`——那只约束首字符，`bad/id` 也能通过。
+    // 正确写法是「不包含集合外字符」。
+    check("products_id_check", sql`${t.id} NOT GLOB '*[^A-Za-z0-9_-]*'`),
     check(
       "products_lifecycle_status_check",
       sql`${t.lifecycleStatus} IN ('developing','published','archived')`,
