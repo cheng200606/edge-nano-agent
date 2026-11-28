@@ -89,6 +89,19 @@ export interface CreateCommandInput {
 
 const nowMs = () => Date.now();
 
+interface RunOutcome {
+  lastInsertRowid?: number | bigint;
+  changes?: number;
+}
+
+/**
+ * drizzle 的同步 `.run()` 在类型声明上是 void，但 bun:sqlite 运行时会返回
+ * `{ lastInsertRowid, changes }`。这里收口成一个显式断言，避免逐个 `as any`。
+ */
+function outcome(result: unknown): RunOutcome {
+  return result as RunOutcome;
+}
+
 export class DeviceService {
   private readonly handle: DatabaseHandle;
 
@@ -321,20 +334,22 @@ export class DeviceService {
   // ---------------------------------------------------------------- 事件
 
   logEvent(input: LogEventInput): number {
-    const result = this.db
-      .insert(deviceEvents)
-      .values({
-        productId: input.productId,
-        deviceId: input.deviceId,
-        namespace: input.namespace ?? "",
-        type: input.type,
-        summary: input.summary ?? "",
-        detail: (input.detail ?? {}) as never,
-        source: input.source ?? "",
-        occurredAt: input.occurredAt ?? nowMs(),
-        createdAt: nowMs(),
-      })
-      .run();
+    const result = outcome(
+      this.db
+        .insert(deviceEvents)
+        .values({
+          productId: input.productId,
+          deviceId: input.deviceId,
+          namespace: input.namespace ?? "",
+          type: input.type,
+          summary: input.summary ?? "",
+          detail: (input.detail ?? {}) as never,
+          source: input.source ?? "",
+          occurredAt: input.occurredAt ?? nowMs(),
+          createdAt: nowMs(),
+        })
+        .run(),
+    );
     return Number(result.lastInsertRowid ?? 0);
   }
 
@@ -359,14 +374,16 @@ export class DeviceService {
   /** 按天清理：分批删，避免一次删太多把库锁住。 */
   cleanupDeviceEvents(retentionDays = 30, batchSize = 1000): number {
     const cutoff = nowMs() - retentionDays * 24 * 60 * 60 * 1000;
-    const result = this.db
-      .delete(deviceEvents)
-      .where(
-        sql`${deviceEvents.id} IN (
-          SELECT id FROM ${deviceEvents} WHERE ${deviceEvents.createdAt} < ${cutoff} LIMIT ${batchSize}
-        )`,
-      )
-      .run();
+    const result = outcome(
+      this.db
+        .delete(deviceEvents)
+        .where(
+          sql`${deviceEvents.id} IN (
+            SELECT id FROM ${deviceEvents} WHERE ${deviceEvents.createdAt} < ${cutoff} LIMIT ${batchSize}
+          )`,
+        )
+        .run(),
+    );
     return Number(result.changes ?? 0);
   }
 
@@ -442,11 +459,13 @@ export class DeviceService {
    * 台账状态才是唯一事实来源。
    */
   expireCommands(now = nowMs()): number {
-    const result = this.db
-      .update(deviceCommands)
-      .set({ status: "timeout", completedAt: now })
-      .where(and(eq(deviceCommands.status, "pending"), lt(deviceCommands.deadlineAt, now)))
-      .run();
+    const result = outcome(
+      this.db
+        .update(deviceCommands)
+        .set({ status: "timeout", completedAt: now })
+        .where(and(eq(deviceCommands.status, "pending"), lt(deviceCommands.deadlineAt, now)))
+        .run(),
+    );
     return Number(result.changes ?? 0);
   }
 
@@ -473,11 +492,13 @@ export class DeviceService {
     }
     let added = 0;
     for (const deviceId of deviceIds) {
-      const r = this.db
-        .insert(deviceTags)
-        .values({ productId, deviceId, tagId, createdAt: nowMs() })
-        .onConflictDoNothing()
-        .run();
+      const r = outcome(
+        this.db
+          .insert(deviceTags)
+          .values({ productId, deviceId, tagId, createdAt: nowMs() })
+          .onConflictDoNothing()
+          .run(),
+      );
       added += Number(r.changes ?? 0);
     }
     return added;

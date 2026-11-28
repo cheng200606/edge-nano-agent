@@ -126,14 +126,14 @@ describe("状态影子更新", () => {
     const d = svc.getDeviceInProduct("p1", "dev-1");
     expect(d?.status).toBe("online");
     expect(d?.lastSeenAt).toBeGreaterThanOrEqual(before);
-    expect((d?.reportedState as { temp: number }).temp).toBe(42);
+    expect((d?.reportedState as { temp?: number } | undefined)?.temp).toBe(42);
   });
 
   test("updateDesiredState 只改期望值", () => {
     svc.updateDesiredState("p1", "dev-1", { mode: "eco" });
     const d = svc.getDeviceInProduct("p1", "dev-1");
-    expect((d?.desiredState as { mode: string }).mode).toBe("eco");
-    expect((d?.reportedState as { temp: number }).temp).toBe(42);
+    expect((d?.desiredState as { mode?: string } | undefined)?.mode).toBe("eco");
+    expect((d?.reportedState as { temp?: number } | undefined)?.temp).toBe(42);
   });
 });
 
