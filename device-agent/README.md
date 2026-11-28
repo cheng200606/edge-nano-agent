@@ -69,10 +69,13 @@ curl -N -X POST localhost:3000/api/chat \
 | `bun run typecheck` / `lint` / `format` | 质量门 |
 | `bun test` | 全量测试（当前 **123 pass**） |
 | `bun run db:check` | 起临时库跑迁移，核对表数 / WAL / FK（不依赖 spawn） |
+| `bun run db:migrate` | 对**真实运行库**执行迁移（`<home>/device_agent.sqlite`），用于手动修复 / 升级既有环境 |
+| `bun run db:generate` | 改 schema 后生成增量迁移 |
+| `bun run config:schema` | 从 zod schema 生成 `config/config.schema.json`（随包分发的配置 JSON Schema） |
+| `bun run build` | 编译单文件可执行：`dist/device-agent.exe`（含 drizzle 副本） |
 | `bun run e2e:m3` | 真实 broker 上的设备闭环验收（10 项断言；broker 没起会自启） |
 | `bun run verify:m4` | SSE 端到端验收（15 项断言，不依赖 broker） |
 | `bun run mqtt:start` / `stop` / `status` | 项目托管 mosquitto |
-| `bun run db:generate` | 改 schema 后生成增量迁移 |
 
 ---
 
@@ -287,8 +290,12 @@ device-agent/
 │  ├─ persistence/src/           Drizzle schema + 迁移 + DeviceService
 │  └─ iot-platform/src/          default provider（主题与报文翻译）
 ├─ drizzle/                      drizzle-kit 生成的迁移（0000 建表、0001 幂等键）
-├─ config/mosquitto.conf         项目托管 broker 配置（1884）
-├─ scripts/                      demo / e2e / verify / broker / db 自检
+├─ config/
+│  ├─ mosquitto.conf             项目托管 broker 配置（1884）
+│  └─ config.schema.json         由 zod schema 生成，随包分发（勿手改）
+├─ .agents/skills/               技能包目录（M8 实现加载器）
+├─ scripts/                      demo / e2e / verify / build / broker / db 自检 / 生成 schema
+├─ dist/                         打包产物（gitignore）
 └─ .device_agent/                运行态（config.json 含密钥、sqlite、logs、pi-sessions）— 不要提交
 ```
 
@@ -307,7 +314,7 @@ device-agent/
 | M6 通道与 API | LU-07 | ⏳ |
 | M7 工作流 | LU-09 | ⏳ 降级为设计文档 |
 | M8 定时 + 技能 | LU-10 | ⏳ 降级为设计文档 |
-| M9 控制台 + 发布 | LU-12 / LU-13 | ⏳ 仅 bun build |
+| M9 控制台 + 发布 | LU-12 / LU-13 | 🔶 部分（`bun run build` 已可用：111 MB 单文件 + drizzle 副本，实测 `/readyz` 双依赖就绪） |
 
 质量门当前：`bun test` **123 pass / 0 fail**、`tsc` 0 error、`biome` 0 error。
 

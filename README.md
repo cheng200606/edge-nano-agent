@@ -57,6 +57,7 @@ bun run verify:m4     # 15 项断言，不依赖 broker
 | `bun run e2e:m3` | 真实 broker 上的设备闭环（10 项断言） | 全 PASS |
 | `bun run verify:m4` | SSE 端到端（15 项断言，不依赖 broker） | 全 PASS |
 | `bun run demo` | 答辩现场演示 | 可用 |
+| `bun run build` | 编译单文件可执行 + 发行拷 drizzle | `dist/device-agent.exe` 111 MB，实测可启动 |
 
 ---
 

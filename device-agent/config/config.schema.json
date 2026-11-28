@@ -1,0 +1,426 @@
+{
+  "$comment": "由 scripts/gen-config-schema.ts 从 packages/shared/src/device-agent-config-schema.ts 生成，勿手改",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "default": 1,
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "cloud": {
+      "default": {
+        "worker": "standalone",
+        "instanceId": "local"
+      },
+      "type": "object",
+      "properties": {
+        "worker": {
+          "default": "standalone",
+          "type": "string",
+          "enum": ["standalone", "cloud-all", "cloud-api", "cloud-worker"]
+        },
+        "instanceId": {
+          "default": "local",
+          "type": "string"
+        }
+      }
+    },
+    "mqtt": {
+      "default": {
+        "brokerUrl": "mqtt://127.0.0.1:1884",
+        "wsUrl": "",
+        "clientId": "device-agent",
+        "keepAliveSeconds": 60,
+        "autoReconnect": true,
+        "reconnectPeriodMs": 3000,
+        "cleanStart": true,
+        "username": "",
+        "password": ""
+      },
+      "type": "object",
+      "properties": {
+        "brokerUrl": {
+          "default": "mqtt://127.0.0.1:1884",
+          "type": "string"
+        },
+        "wsUrl": {
+          "default": "",
+          "type": "string"
+        },
+        "clientId": {
+          "default": "device-agent",
+          "type": "string"
+        },
+        "keepAliveSeconds": {
+          "default": 60,
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 3600
+        },
+        "autoReconnect": {
+          "default": true,
+          "type": "boolean"
+        },
+        "reconnectPeriodMs": {
+          "default": 3000,
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 9007199254740991
+        },
+        "cleanStart": {
+          "default": true,
+          "type": "boolean"
+        },
+        "username": {
+          "default": "",
+          "type": "string"
+        },
+        "password": {
+          "default": "",
+          "type": "string"
+        }
+      }
+    },
+    "models": {
+      "default": {
+        "agent": {
+          "provider": "mock",
+          "baseUrl": "",
+          "apiKey": "",
+          "model": "",
+          "temperature": 0.2,
+          "maxTokens": 2048
+        },
+        "vision": {
+          "provider": "mock",
+          "baseUrl": "",
+          "apiKey": "",
+          "model": "",
+          "temperature": 0.2,
+          "maxTokens": 2048
+        },
+        "decision": {
+          "provider": "mock",
+          "baseUrl": "",
+          "apiKey": "",
+          "model": "",
+          "temperature": 0.2,
+          "maxTokens": 2048
+        }
+      },
+      "type": "object",
+      "properties": {
+        "agent": {
+          "default": {
+            "provider": "mock",
+            "baseUrl": "",
+            "apiKey": "",
+            "model": "",
+            "temperature": 0.2,
+            "maxTokens": 2048
+          },
+          "type": "object",
+          "properties": {
+            "provider": {
+              "default": "mock",
+              "type": "string",
+              "enum": ["mock", "openai", "volcengine"]
+            },
+            "baseUrl": {
+              "default": "",
+              "type": "string"
+            },
+            "apiKey": {
+              "default": "",
+              "type": "string"
+            },
+            "model": {
+              "default": "",
+              "type": "string"
+            },
+            "temperature": {
+              "default": 0.2,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "maxTokens": {
+              "default": 2048,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200000
+            }
+          }
+        },
+        "vision": {
+          "default": {
+            "provider": "mock",
+            "baseUrl": "",
+            "apiKey": "",
+            "model": "",
+            "temperature": 0.2,
+            "maxTokens": 2048
+          },
+          "type": "object",
+          "properties": {
+            "provider": {
+              "default": "mock",
+              "type": "string",
+              "enum": ["mock", "openai", "volcengine"]
+            },
+            "baseUrl": {
+              "default": "",
+              "type": "string"
+            },
+            "apiKey": {
+              "default": "",
+              "type": "string"
+            },
+            "model": {
+              "default": "",
+              "type": "string"
+            },
+            "temperature": {
+              "default": 0.2,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "maxTokens": {
+              "default": 2048,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200000
+            }
+          }
+        },
+        "decision": {
+          "default": {
+            "provider": "mock",
+            "baseUrl": "",
+            "apiKey": "",
+            "model": "",
+            "temperature": 0.2,
+            "maxTokens": 2048
+          },
+          "type": "object",
+          "properties": {
+            "provider": {
+              "default": "mock",
+              "type": "string",
+              "enum": ["mock", "openai", "volcengine"]
+            },
+            "baseUrl": {
+              "default": "",
+              "type": "string"
+            },
+            "apiKey": {
+              "default": "",
+              "type": "string"
+            },
+            "model": {
+              "default": "",
+              "type": "string"
+            },
+            "temperature": {
+              "default": 0.2,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "maxTokens": {
+              "default": 2048,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200000
+            }
+          }
+        }
+      }
+    },
+    "iotPlatform": {
+      "default": {
+        "providerId": "default",
+        "config": {}
+      },
+      "type": "object",
+      "properties": {
+        "providerId": {
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "fleets", "thingsneural"]
+        },
+        "config": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    "voice": {
+      "default": {
+        "enabled": false,
+        "provider": "none",
+        "asrSampleRate": 16000
+      },
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "provider": {
+          "default": "none",
+          "type": "string",
+          "enum": ["volcengine", "aliyun", "aws", "elevenlabs", "none"]
+        },
+        "asrSampleRate": {
+          "default": 16000,
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "im": {
+      "default": {
+        "feishu": {},
+        "dingtalk": {},
+        "discord": {},
+        "telegram": {},
+        "slack": {}
+      },
+      "type": "object",
+      "properties": {
+        "feishu": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "dingtalk": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "discord": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "telegram": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "slack": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    "logging": {
+      "default": {
+        "level": "info",
+        "console": true,
+        "file": true
+      },
+      "type": "object",
+      "properties": {
+        "level": {
+          "default": "info",
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"]
+        },
+        "console": {
+          "default": true,
+          "type": "boolean"
+        },
+        "file": {
+          "default": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "aiCredits": {
+      "default": {
+        "enabled": false,
+        "currency": "CNY",
+        "defaultLimit": 0,
+        "rates": {},
+        "modelMultipliers": {}
+      },
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "currency": {
+          "default": "CNY",
+          "type": "string"
+        },
+        "defaultLimit": {
+          "default": 0,
+          "type": "number"
+        },
+        "rates": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "modelMultipliers": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "default": {
+        "tools": []
+      },
+      "type": "object",
+      "properties": {
+        "tools": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

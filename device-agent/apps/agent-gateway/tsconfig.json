@@ -4,5 +4,12 @@
     "baseUrl": "../..",
     "rootDir": "../.."
   },
-  "include": ["src/**/*.ts", "../../packages/**/*.ts", "../../types/**/*.d.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../../packages/**/*.ts",
+    "../../scripts/**/*.ts",
+    "../../types/**/*.d.ts",
+    "../../drizzle.config.ts"
+  ],
+  "exclude": ["../../node_modules", "../../dist", "../../**/node_modules/**"]
 }
